@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8008"
+    volumes:
+      - .:/app
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+volumes:
+  ollama_data:
