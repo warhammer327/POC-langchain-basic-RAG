@@ -1,4 +1,5 @@
 from langchain.chains.history_aware_retriever import create_history_aware_retriever
+from langchain_core import vectorstores
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_ollama import ChatOllama
 from langchain_community.document_loaders import TextLoader, WebBaseLoader
@@ -18,10 +19,10 @@ text_splitter = CharacterTextSplitter(chunk_size=100, chunk_overlap=20)
 documents = text_splitter.split_documents(raw_documents)
 
 embedding = OllamaEmbeddings(model="nomic-embed-text")
-db = Chroma.from_documents(documents, embedding=embedding)
+vectorstore = Chroma.from_documents(documents, embedding=embedding)
 
 query = "What did the president say about russia"
-docs = db.similarity_search(query)
+docs = vectorstore.similarity_search(query)
 
 prompt = ChatPromptTemplate.from_template("""add humor to the response.
 
