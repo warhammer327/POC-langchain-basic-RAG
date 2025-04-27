@@ -13,19 +13,22 @@ from langchain_core.documents import Document
 # Initialize LLM
 llm = ChatOllama(model="llama3.2", temperature=0.7)
 
-# Load documents about LangSmith for our knowledge base
+# Load documents from the link for our knowledge base
 print("Loading and processing documents...")
 docs = WebBaseLoader("https://www.sevensix.co.jp/topics/iqom_invention-award/").load()
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
 documents = text_splitter.split_documents(docs)
-print(f"Created {len(documents)} document chunks")
-for doc in documents:
-    print(f"{doc}\n")
-print("#################################")
+
+# print(f"Created {len(documents)} document chunks")
+# for doc in documents:
+#    print(f"{doc}\n")
+# print("#################################")
 
 # Create embedding model and vector store
 embedding = OllamaEmbeddings(model="nomic-embed-text")
+# Chromadb provides in-memory vector storage
 vectorstore = Chroma.from_documents(documents, embedding=embedding)
+# Create retriever with appropriate k value based on document count
 retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 
 # Create a history-aware retriever that generates search queries based on conversation
@@ -50,7 +53,7 @@ qa_prompt = ChatPromptTemplate.from_messages(
         (
             "system",
             "You are a helpful assistant that answers questions based on the retrieved context. "
-            "Give answer in 2 lines. "
+            "Keep the answer short. "
             "If the information isn't in the context, acknowledge what you don't know.\n\n"
             "Context: {context}",
         ),
@@ -177,10 +180,10 @@ if __name__ == "__main__":
     print("===================================================")
 
     # Run the examples
-    example_1()
+    # example_1()
     # example_2()
 
     # Interactive mode
-    # print("\n===== INTERACTIVE MODE =====")
-    # print("Start a conversation (type 'exit' to quit)")
-    # chat_with_documents()
+    print("\n===== INTERACTIVE MODE =====")
+    print("Start a conversation (type 'exit' to quit)")
+    chat_with_documents()
