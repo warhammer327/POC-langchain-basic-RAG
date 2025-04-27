@@ -15,9 +15,7 @@ llm = ChatOllama(model="llama3.2", temperature=0.7)
 
 # Load documents about LangSmith for our knowledge base
 print("Loading and processing documents...")
-docs = WebBaseLoader(
-    "https://docs.smith.langchain.com/prompt_engineering/quickstarts/quickstart_ui"
-).load()
+docs = WebBaseLoader("https://www.sevensix.co.jp/topics/iqom_invention-award/").load()
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
 documents = text_splitter.split_documents(docs)
 print(f"Created {len(documents)} document chunks")
@@ -100,7 +98,7 @@ def example_1():
     print("\n===== EXAMPLE 1: New Conversation =====")
     # Initial query about LangSmith
     chat_history = []
-    query = "do i need langsmith account to setup prompt?"
+    query = "what is iQoM?"
 
     print(f"User: {query}")
     response = conversation_retrieval_chain.invoke(
@@ -113,7 +111,7 @@ def example_1():
     chat_history.append(AIMessage(content=response["answer"]))
 
     # Follow-up question
-    follow_up = "how to create it in langsmith"
+    follow_up = "what wavelength are generated from it?"
     print(f"\nUser: {follow_up}")
     response = conversation_retrieval_chain.invoke(
         {"chat_history": chat_history, "input": follow_up}
@@ -125,10 +123,20 @@ def example_1():
     chat_history.append(AIMessage(content=response["answer"]))
 
     # Second follow-up question referring to previous context
-    second_follow_up = "how to save it ?"
+    second_follow_up = "how many wavelength does it have ?"
     print(f"\nUser: {second_follow_up}")
     response = conversation_retrieval_chain.invoke(
         {"chat_history": chat_history, "input": second_follow_up}
+    )
+    print(f"AI: {response['answer']}")
+
+    chat_history.append(HumanMessage(content=second_follow_up))
+    chat_history.append(AIMessage(content=response["answer"]))
+
+    third_follow_up = "how it has achieved lower cost?"
+    print(f"\nUser: {third_follow_up}")
+    response = conversation_retrieval_chain.invoke(
+        {"chat_history": chat_history, "input": third_follow_up}
     )
     print(f"AI: {response['answer']}")
 
@@ -169,8 +177,8 @@ if __name__ == "__main__":
     print("===================================================")
 
     # Run the examples
-    # example_1()
-    example_2()
+    example_1()
+    # example_2()
 
     # Interactive mode
     # print("\n===== INTERACTIVE MODE =====")
