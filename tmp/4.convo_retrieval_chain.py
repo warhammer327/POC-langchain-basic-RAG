@@ -8,7 +8,6 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains.retrieval import create_retrieval_chain
 from langchain.chains.history_aware_retriever import create_history_aware_retriever
 from langchain_core.messages import HumanMessage, AIMessage
-from langchain_core.documents import Document
 
 # Initialize LLM
 llm = ChatOllama(model="llama3.2", temperature=0.7)
