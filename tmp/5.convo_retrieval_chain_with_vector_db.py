@@ -9,25 +9,86 @@ from langchain.chains.retrieval import create_retrieval_chain
 from langchain.chains.history_aware_retriever import create_history_aware_retriever
 from langchain_core.messages import HumanMessage, AIMessage
 
+import json
+import re
+import weaviate
+from weaviate.exceptions import WeaviateConnectionError
+from weaviate.types import INCLUDE_VECTOR
+
 # Initialize LLM
 llm = ChatOllama(model="llama3.2", temperature=0.7)
 
 # Load documents from the link for our knowledge base
-
 print("======Loading and processing documents======")
 docs = WebBaseLoader("https://www.sevensix.co.jp/topics/iqom_invention-award/").load()
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=250, chunk_overlap=50)
 documents = text_splitter.split_documents(docs)
 
-# print(f"Created {len(documents)} document chunks")
-# for doc in documents:
-#    print(f"{doc}\n")
-# print("#################################")
+document_list = []
+chunk_id = 1
+for doc in documents:
+    if not re.search(r"\n{1,}", doc.page_content):
+        document_dict = {
+            "chunk_id": chunk_id,
+            "page_content": doc.page_content,
+            "metadata": doc.metadata,
+        }
+        document_list.append(document_dict)
+        chunk_id += 1
+
+# Convert to JSON string
+json_output = json.dumps(document_list, indent=2, ensure_ascii=False)
 
 # Create embedding model and vector store
-print("======Making embedding======")
+print("======Choosing embedding======")
 embedding = OllamaEmbeddings(model="nomic-embed-text")
-# Chromadb provides in-memory vector storage
+
+print("======Connecting to weaviate======")
+try:
+    client = weaviate.connect_to_local(
+        host="localhost",
+        port=8087,
+    )
+    print("======Connection established to weaviate======")
+    print("======Creating product class schema======")
+    if not client.collections.exists("Product"):
+        client.collections.create(name="Product")
+
+    collection = client.collections.get("Product")
+    print("======Inserting documents======")
+
+    print("======Start======")
+    print("======From======")
+    print("======Here======")
+    try:
+        is_empty = collection.aggregate.over_all(total_count=True)
+        print(is_empty)
+        if is_empty == 0:
+            with client.batch.fixed_size(batch_size=5) as batch:
+                for doc in document_list:
+                    vector = embedding.embed_documents([doc["page_content"]])[0]
+                    collection.data.insert(
+                        properties={
+                            "text": doc["page_content"],
+                            "source": doc["metadata"].get("source", ""),
+                            "chunk_id": doc["chunk_id"],
+                        },
+                        vector=vector,
+                    )
+        print("======Insertion completed======")
+    except Exception as e:
+        print(f"Error inserting document: {e}")
+
+    try:
+        print("======Read from product table======")
+        collection = client.collections.get("Product").query.fetch_objects(limit=100)
+        print(collection)
+    except Exception as e:
+        print(f"Error fetching documents:{e}")
+except WeaviateConnectionError as e:
+    print(f"Error connecting to weaviate: {e}")
+
+
 vectorstore = Chroma.from_documents(documents, embedding=embedding)
 # Create retriever with appropriate k value based on document count
 retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
