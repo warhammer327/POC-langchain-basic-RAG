@@ -1,6 +1,5 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_ollama import ChatOllama
-from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
 from langchain_community.document_loaders import WebBaseLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -8,12 +7,12 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains.retrieval import create_retrieval_chain
 from langchain.chains.history_aware_retriever import create_history_aware_retriever
 from langchain_core.messages import HumanMessage, AIMessage
+from langchain_weaviate import WeaviateVectorStore
 
-import json
 import re
 import weaviate
+from weaviate import WeaviateClient
 from weaviate.exceptions import WeaviateConnectionError
-from weaviate.types import INCLUDE_VECTOR
 
 # Initialize LLM
 llm = ChatOllama(model="llama3.2", temperature=0.7)
@@ -21,7 +20,7 @@ llm = ChatOllama(model="llama3.2", temperature=0.7)
 # Load documents from the link for our knowledge base
 print("======Loading and processing documents======")
 docs = WebBaseLoader("https://www.sevensix.co.jp/topics/iqom_invention-award/").load()
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=250, chunk_overlap=50)
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
 documents = text_splitter.split_documents(docs)
 
 document_list = []
@@ -36,20 +35,16 @@ for doc in documents:
         document_list.append(document_dict)
         chunk_id += 1
 
-# Convert to JSON string
-json_output = json.dumps(document_list, indent=2, ensure_ascii=False)
-
 # Create embedding model and vector store
 print("======Choosing embedding======")
 embedding = OllamaEmbeddings(model="nomic-embed-text")
-
+vectorstore = None
 print("======Connecting to weaviate======")
 try:
     client = weaviate.connect_to_local(
         host="localhost",
         port=8087,
     )
-    print("======Connection established to weaviate======")
     print("======Creating product class schema======")
     if not client.collections.exists("Product"):
         client.collections.create(name="Product")
@@ -57,42 +52,54 @@ try:
     collection = client.collections.get("Product")
     print("======Inserting documents======")
 
-    print("======Start======")
-    print("======From======")
-    print("======Here======")
     try:
         is_empty = collection.aggregate.over_all(total_count=True)
-        print(is_empty)
-        if is_empty == 0:
-            with client.batch.fixed_size(batch_size=5) as batch:
-                for doc in document_list:
-                    vector = embedding.embed_documents([doc["page_content"]])[0]
-                    collection.data.insert(
-                        properties={
-                            "text": doc["page_content"],
-                            "source": doc["metadata"].get("source", ""),
-                            "chunk_id": doc["chunk_id"],
-                        },
-                        vector=vector,
-                    )
+        print(f"-> {document_list}\n")
+        if is_empty.total_count == 0:
+            print("======Insertion on going======")
+            for doc in document_list:
+                vector = embedding.embed_documents([doc["page_content"]])[0]
+                collection.data.insert(
+                    properties={
+                        "text": doc["page_content"],
+                        "source": doc["metadata"].get("source", ""),
+                        "chunk_id": doc["chunk_id"],
+                    },
+                    vector=vector,
+                )
         print("======Insertion completed======")
+        try:
+            print("======Read from Product collection======")
+            collection = client.collections.get("Product").query.fetch_objects(
+                limit=100
+            )
+            for i, item in enumerate(collection.objects):
+                print(f"{item}\n\n")
+        except Exception as e:
+            print(f"Error fetching documents:{e}")
     except Exception as e:
         print(f"Error inserting document: {e}")
 
     try:
-        print("======Read from product table======")
-        collection = client.collections.get("Product").query.fetch_objects(limit=100)
-        print(collection)
+        print("======Setup vector store======")
+        vectorstore = WeaviateVectorStore(
+            client=client,
+            index_name="Product",
+            text_key="text",
+            embedding=embedding,
+        )
     except Exception as e:
-        print(f"Error fetching documents:{e}")
+        print(f"{e}")
+
 except WeaviateConnectionError as e:
     print(f"Error connecting to weaviate: {e}")
 
 
-vectorstore = Chroma.from_documents(documents, embedding=embedding)
-# Create retriever with appropriate k value based on document count
-retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+print(vectorstore)
+if not vectorstore:
+    raise RuntimeError("vectorstore initialization failed")
 
+retriever = vectorstore.as_retriever(search_kwargs={"k": 2})
 # Create a history-aware retriever that generates search queries based on conversation
 retriever_prompt = ChatPromptTemplate.from_messages(
     [
@@ -177,6 +184,8 @@ def example_1():
     chat_history.append(HumanMessage(content=query))
     chat_history.append(AIMessage(content=response["answer"]))
 
+    print(f"-> {len(chat_history)}")
+
     # Follow-up question
     follow_up = "what wavelength are generated from it?"
     print(f"\nUser: {follow_up}")
@@ -189,6 +198,7 @@ def example_1():
     chat_history.append(HumanMessage(content=follow_up))
     chat_history.append(AIMessage(content=response["answer"]))
 
+    print(f"-> {len(chat_history)}")
     # Second follow-up question referring to previous context
     second_follow_up = "how many wavelength does it have ?"
     print(f"\nUser: {second_follow_up}")
@@ -200,6 +210,7 @@ def example_1():
     chat_history.append(HumanMessage(content=second_follow_up))
     chat_history.append(AIMessage(content=response["answer"]))
 
+    print(f"-> {len(chat_history)}")
     third_follow_up = "how it has achieved lower cost?"
     print(f"\nUser: {third_follow_up}")
     response = conversation_retrieval_chain.invoke(
@@ -241,13 +252,13 @@ def example_2():
 # Run the examples
 if __name__ == "__main__":
     print("Conversation Retrieval Chain with Persistent Context")
-    print("===================================================")
+    # print("===================================================")
 
     # Run the examples
-    # example_1()
-    # example_2()
+    example_1()
+# example_2()
 
-    # Interactive mode
-    print("\n===== INTERACTIVE MODE =====")
-    print("Start a conversation (type 'exit' to quit)")
-    chat_with_documents()
+# Interactive mode
+# print("\n===== INTERACTIVE MODE =====")
+# print("Start a conversation (type 'exit' to quit)")
+# chat_with_documents()
