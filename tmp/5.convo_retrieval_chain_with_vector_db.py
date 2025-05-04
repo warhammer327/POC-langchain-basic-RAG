@@ -1,3 +1,7 @@
+import os
+import time
+import logging
+import warnings
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_ollama import ChatOllama
 from langchain_ollama import OllamaEmbeddings
@@ -11,8 +15,17 @@ from langchain_weaviate import WeaviateVectorStore
 
 import re
 import weaviate
-from weaviate import WeaviateClient
 from weaviate.exceptions import WeaviateConnectionError
+
+warnings.filterwarnings(
+    "ignore",
+    message=".*Accessing the 'model_fields' attribute on the instance is deprecated.*",
+)
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="ollama._types")
+warnings.filterwarnings(
+    "ignore", category=PendingDeprecationWarning, module="ollama._types"
+)
+
 
 # Initialize LLM
 llm = ChatOllama(model="llama3.2", temperature=0.7)
@@ -90,7 +103,6 @@ try:
         )
     except Exception as e:
         print(f"{e}")
-
 except WeaviateConnectionError as e:
     print(f"Error connecting to weaviate: {e}")
 
@@ -145,7 +157,7 @@ def chat_with_documents(chat_history=None):
         chat_history = []
 
     while True:
-        user_input = input("\nYour question (or type 'exit' to quit): ")
+        user_input = input("\nYour question: ")
         if user_input.lower() == "exit":
             break
 
@@ -178,13 +190,11 @@ def example_1():
     response = conversation_retrieval_chain.invoke(
         {"chat_history": chat_history, "input": query}
     )
-    print(f"AI: {response['answer']}")
+    print(f"--> AI: {response['answer']}")
 
     # Update chat history
     chat_history.append(HumanMessage(content=query))
     chat_history.append(AIMessage(content=response["answer"]))
-
-    print(f"-> {len(chat_history)}")
 
     # Follow-up question
     follow_up = "what wavelength are generated from it?"
@@ -192,31 +202,31 @@ def example_1():
     response = conversation_retrieval_chain.invoke(
         {"chat_history": chat_history, "input": follow_up}
     )
-    print(f"AI: {response['answer']}")
+    print(f"--> AI: {response['answer']}")
 
     # Update chat history
     chat_history.append(HumanMessage(content=follow_up))
     chat_history.append(AIMessage(content=response["answer"]))
 
-    print(f"-> {len(chat_history)}")
     # Second follow-up question referring to previous context
     second_follow_up = "how many wavelength does it have ?"
     print(f"\nUser: {second_follow_up}")
     response = conversation_retrieval_chain.invoke(
         {"chat_history": chat_history, "input": second_follow_up}
     )
-    print(f"AI: {response['answer']}")
+    print(f"--> AI: {response['answer']}")
 
     chat_history.append(HumanMessage(content=second_follow_up))
     chat_history.append(AIMessage(content=response["answer"]))
 
-    print(f"-> {len(chat_history)}")
     third_follow_up = "how it has achieved lower cost?"
-    print(f"\nUser: {third_follow_up}")
+    print(
+        f"\nUser: {third_follow_up} (knowledgebase has no information regarding this.)"
+    )
     response = conversation_retrieval_chain.invoke(
         {"chat_history": chat_history, "input": third_follow_up}
     )
-    print(f"AI: {response['answer']}")
+    print(f"--> AI: {response['answer']}")
 
 
 # Example 2: Testing with ambiguous follow-up questions
@@ -255,10 +265,13 @@ if __name__ == "__main__":
     # print("===================================================")
 
     # Run the examples
-    example_1()
-# example_2()
+    # example_2()
 
-# Interactive mode
-# print("\n===== INTERACTIVE MODE =====")
-# print("Start a conversation (type 'exit' to quit)")
-# chat_with_documents()
+    start_time = time.time()
+    example_1()
+    end_time = time.time()
+    execution_time = end_time - start_time
+    print(f"\nExecution time: {execution_time:.2f} seconds")
+    print("\n===== INTERACTIVE MODE =====")
+    print("Start a conversation (type 'exit' to quit)")
+    chat_with_documents()
