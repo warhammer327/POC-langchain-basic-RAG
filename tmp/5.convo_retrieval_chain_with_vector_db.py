@@ -173,6 +173,12 @@ def chat_with_documents(chat_history=None):
         # Update chat history with this exchange
         chat_history.append(HumanMessage(content=user_input))
         chat_history.append(AIMessage(content=response))
+    try:
+        if client and client.is_ready():
+            client.close()
+            print("\nWeaviate connection closed.")
+    except Exception as e:
+        print(f"\nError closing Weaviate connection: {e}")
 
 
 # Example 1: Starting a new conversation
@@ -284,11 +290,11 @@ if __name__ == "__main__":
     # Run the examples
     # example_2()
 
-    start_time = time.time()
-    example_1()
-    end_time = time.time()
-    execution_time = end_time - start_time
-    print(f"\nExecution time: {execution_time:.2f} seconds")
+    # start_time = time.time()
+    # example_1()
+    # end_time = time.time()
+    # execution_time = end_time - start_time
+    # print(f"\nExecution time: {execution_time:.2f} seconds")
     print("\n===== INTERACTIVE MODE =====")
     print("Start a conversation (type 'exit' to quit)")
     chat_with_documents()
