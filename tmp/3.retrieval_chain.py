@@ -30,7 +30,8 @@ embedding = OllamaEmbeddings(model="nomic-embed-text")
 vectorstore = Chroma.from_documents(documents, embedding=embedding)
 
 # Create a prompt template that explicitly instructs to use the context
-prompt = ChatPromptTemplate.from_template("""
+prompt = ChatPromptTemplate.from_template(
+    """
 You are an assistant that answers questions based ONLY on the context provided below.
 If the information isn't in the context, say "I don't have that information in the provided context."
 
@@ -40,7 +41,8 @@ Context:
 Question: {input}
 
 Answer:
-""")
+"""
+)
 
 # Create document chain
 document_chain = create_stuff_documents_chain(llm, prompt)

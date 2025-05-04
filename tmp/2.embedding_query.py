@@ -22,13 +22,15 @@ vectorstore = Chroma.from_documents(documents, embedding=embedding)
 query = "What did the president say about russia"
 docs = vectorstore.similarity_search(query)
 
-prompt = ChatPromptTemplate.from_template("""add humor to the response.
+prompt = ChatPromptTemplate.from_template(
+    """add humor to the response.
 
 <context>
 {context}
 </context>
 
-""")
+"""
+)
 
 document_chain = create_stuff_documents_chain(llm, prompt)
 
