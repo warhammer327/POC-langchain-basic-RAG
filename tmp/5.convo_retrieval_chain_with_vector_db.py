@@ -1,6 +1,4 @@
-import os
 import time
-import logging
 import warnings
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_ollama import ChatOllama
