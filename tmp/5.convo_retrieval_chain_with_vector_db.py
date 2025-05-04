@@ -1,6 +1,6 @@
 import time
 import warnings
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder, chat
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_ollama import ChatOllama
 from langchain_ollama import OllamaEmbeddings
 from langchain_community.document_loaders import WebBaseLoader
@@ -13,7 +13,6 @@ from langchain_weaviate import WeaviateVectorStore
 
 import re
 import weaviate
-from weaviate.collections.classes.filters import FilterValuesList
 from weaviate.exceptions import WeaviateConnectionError
 
 warnings.filterwarnings(
@@ -160,21 +159,20 @@ def chat_with_documents(chat_history=None):
             break
 
         # Process the query with the conversation chain
-        response = conversation_retrieval_chain.invoke(
+        response = ""
+        print("-->AI:", end="", flush=True)
+        for chunk in conversation_retrieval_chain.stream(
             {"chat_history": chat_history, "input": user_input}
-        )
+        ):
+            if "answer" in chunk:
+                print(chunk["answer"], end="", flush=True)
+                response += chunk["answer"]
 
         # Print the answer
-        print("\nAI:", response["answer"])
 
         # Update chat history with this exchange
         chat_history.append(HumanMessage(content=user_input))
-        chat_history.append(AIMessage(content=response["answer"]))
-
-        # Optional: Print retrieved documents (for debugging)
-        # print("\nRetrieved context:")
-        # for i, doc in enumerate(response["context"], 1):
-        #     print(f"Document {i}: {doc.page_content[:150]}...")
+        chat_history.append(AIMessage(content=response))
 
 
 # Example 1: Starting a new conversation
@@ -280,7 +278,7 @@ def example_2():
 
 # Run the examples
 if __name__ == "__main__":
-    print("Conversation Retrieval Chain with Persistent Context")
+    print("\nConversation Retrieval Chain with Persistent Context")
     # print("===================================================")
 
     # Run the examples
@@ -291,6 +289,6 @@ if __name__ == "__main__":
     end_time = time.time()
     execution_time = end_time - start_time
     print(f"\nExecution time: {execution_time:.2f} seconds")
-    # print("\n===== INTERACTIVE MODE =====")
-    # print("Start a conversation (type 'exit' to quit)")
-    # chat_with_documents()
+    print("\n===== INTERACTIVE MODE =====")
+    print("Start a conversation (type 'exit' to quit)")
+    chat_with_documents()
