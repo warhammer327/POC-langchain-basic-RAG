@@ -1,6 +1,6 @@
 import time
 import warnings
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder, chat
 from langchain_ollama import ChatOllama
 from langchain_ollama import OllamaEmbeddings
 from langchain_community.document_loaders import WebBaseLoader
@@ -13,6 +13,7 @@ from langchain_weaviate import WeaviateVectorStore
 
 import re
 import weaviate
+from weaviate.collections.classes.filters import FilterValuesList
 from weaviate.exceptions import WeaviateConnectionError
 
 warnings.filterwarnings(
@@ -65,7 +66,7 @@ try:
 
     try:
         is_empty = collection.aggregate.over_all(total_count=True)
-        print(f"-> {document_list}\n")
+        # print(f"-> {document_list}\n")
         if is_empty.total_count == 0:
             print("======Insertion on going======")
             for doc in document_list:
@@ -79,15 +80,15 @@ try:
                     vector=vector,
                 )
         print("======Insertion completed======")
-        try:
-            print("======Read from Product collection======")
-            collection = client.collections.get("Product").query.fetch_objects(
-                limit=100
-            )
-            for i, item in enumerate(collection.objects):
-                print(f"{item}\n\n")
-        except Exception as e:
-            print(f"Error fetching documents:{e}")
+        # try:
+        # print("======Read from Product collection======")
+        # collection = client.collections.get("Product").query.fetch_objects(
+        #    limit=100
+        # )
+        # for i, item in enumerate(collection.objects):
+        # print(f"{item}\n\n")
+        # except Exception as e:
+        # print(f"Error fetching documents:{e}")
     except Exception as e:
         print(f"Error inserting document: {e}")
 
@@ -105,7 +106,6 @@ except WeaviateConnectionError as e:
     print(f"Error connecting to weaviate: {e}")
 
 
-print(vectorstore)
 if not vectorstore:
     raise RuntimeError("vectorstore initialization failed")
 
@@ -182,49 +182,70 @@ def example_1():
     print("\n===== EXAMPLE 1: New Conversation =====")
     # Initial query about LangSmith
     chat_history = []
+
     query = "what is iQoM?"
-
     print(f"User: {query}")
-    response = conversation_retrieval_chain.invoke(
-        {"chat_history": chat_history, "input": query}
-    )
-    print(f"--> AI: {response['answer']}")
 
+    # Process the initial query with streaming
+    print("-->AI: ", end="", flush=True)
+    response = ""
+    for chunk in conversation_retrieval_chain.stream(
+        {"chat_history": chat_history, "input": query}
+    ):
+        if "answer" in chunk:
+            print(chunk["answer"], end="", flush=True)
+            response += chunk["answer"]
+
+    # print(f"\n--> here is the response: {response}\n")
     # Update chat history
     chat_history.append(HumanMessage(content=query))
-    chat_history.append(AIMessage(content=response["answer"]))
+    chat_history.append(AIMessage(content=response))
 
     # Follow-up question
     follow_up = "what wavelength are generated from it?"
     print(f"\nUser: {follow_up}")
-    response = conversation_retrieval_chain.invoke(
-        {"chat_history": chat_history, "input": follow_up}
-    )
-    print(f"--> AI: {response['answer']}")
 
+    print("-->AI: ", end="", flush=True)
+    response = ""
+    for chunk in conversation_retrieval_chain.stream(
+        {"chat_history": chat_history, "input": follow_up}
+    ):
+        if "answer" in chunk:
+            print(chunk["answer"], end="", flush=True)
+            response += chunk["answer"]
+
+    # print(f"\n--> here is the response: {response}\n")
     # Update chat history
     chat_history.append(HumanMessage(content=follow_up))
-    chat_history.append(AIMessage(content=response["answer"]))
+    chat_history.append(AIMessage(content=response))
 
     # Second follow-up question referring to previous context
     second_follow_up = "how many wavelength does it have ?"
     print(f"\nUser: {second_follow_up}")
-    response = conversation_retrieval_chain.invoke(
+
+    print("-->AI: ", end="", flush=True)
+    response = ""
+    for chunk in conversation_retrieval_chain.stream(
         {"chat_history": chat_history, "input": second_follow_up}
-    )
-    print(f"--> AI: {response['answer']}")
+    ):
+        if "answer" in chunk:
+            print(chunk["answer"], end="", flush=True)
+            response += chunk["answer"]
 
     chat_history.append(HumanMessage(content=second_follow_up))
-    chat_history.append(AIMessage(content=response["answer"]))
+    chat_history.append(AIMessage(content=response))
 
     third_follow_up = "how it has achieved lower cost?"
     print(
         f"\nUser: {third_follow_up} (knowledgebase has no information regarding this.)"
     )
-    response = conversation_retrieval_chain.invoke(
+
+    print("-->AI: ", end="", flush=True)
+    for chunk in conversation_retrieval_chain.stream(
         {"chat_history": chat_history, "input": third_follow_up}
-    )
-    print(f"--> AI: {response['answer']}")
+    ):
+        if "answer" in chunk:
+            print(chunk["answer"], end="", flush=True)
 
 
 # Example 2: Testing with ambiguous follow-up questions
@@ -270,6 +291,6 @@ if __name__ == "__main__":
     end_time = time.time()
     execution_time = end_time - start_time
     print(f"\nExecution time: {execution_time:.2f} seconds")
-    print("\n===== INTERACTIVE MODE =====")
-    print("Start a conversation (type 'exit' to quit)")
-    chat_with_documents()
+    # print("\n===== INTERACTIVE MODE =====")
+    # print("Start a conversation (type 'exit' to quit)")
+    # chat_with_documents()
