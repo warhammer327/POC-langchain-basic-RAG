@@ -29,7 +29,7 @@ graph = graph_builder.compile()
 def stream_graph_updates(user_input: str):
     for event in graph.stream({"messages": [{"role": "user", "content": user_input}]}):
         for val in event.values():
-            print("Assistant:", val["messages"][-1].content)
+            print("Assistant:", val["messages"][0].content)
 
 
 while True:
