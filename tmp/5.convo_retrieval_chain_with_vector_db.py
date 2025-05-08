@@ -1,4 +1,5 @@
 import warnings
+import time
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_ollama import ChatOllama
 from langchain_ollama import OllamaEmbeddings
@@ -30,7 +31,7 @@ llm = ChatOllama(model="llama3.2", temperature=0.7)
 # Load documents from the link for our knowledge base
 print("======Loading and processing documents======")
 docs = WebBaseLoader("https://www.sevensix.co.jp/topics/iqom_invention-award/").load()
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=200, chunk_overlap=50)
 documents = text_splitter.split_documents(docs)
 
 document_list = []
@@ -107,7 +108,7 @@ except WeaviateConnectionError as e:
 if not vectorstore:
     raise RuntimeError("vectorstore initialization failed")
 
-retriever = vectorstore.as_retriever(search_kwargs={"k": 2})
+retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
 # Create a history-aware retriever that generates search queries based on conversation
 retriever_prompt = ChatPromptTemplate.from_messages(
     [
@@ -125,20 +126,22 @@ history_aware_retriever = create_history_aware_retriever(
     llm, retriever, retriever_prompt
 )
 
-# Create the conversation chain with context and history
 qa_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
             "You are a helpful assistant that answers questions based on the retrieved context. "
-            "Keep the answer short. "
-            "If the information isn't in the context, acknowledge what you don't know.\n\n"
+            "Keep the answer short and concise. "
+            "Extract and synthesize information from the context, even if it's partial. "
+            "Be confident in your responses based on the available information. "
+            "but try to provide relevant information whenever possible.\n\n"
             "Context: {context}",
         ),
         MessagesPlaceholder(variable_name="chat_history"),
         ("user", "{input}"),
     ]
 )
+
 
 print("======Making document chain======")
 document_chain = create_stuff_documents_chain(llm, qa_prompt)
@@ -180,13 +183,14 @@ def chat_with_documents(chat_history=None):
         print(f"\nError closing Weaviate connection: {e}")
 
 
-# Example 1: Starting a new conversation
+# Example 1: Starting a new conversation with targeted iQoM questions
 def example_1():
     print("\n===== EXAMPLE 1: New Conversation =====")
-    # Initial query about LangSmith
+    # Initial query about iQoM
     chat_history = []
 
-    query = "what is iQoM?"
+    # Question 1: Basic information about iQoM
+    query = "What is iQoM and what award did it win?"
     print(f"User: {query}")
 
     # Process the initial query with streaming
@@ -198,14 +202,14 @@ def example_1():
         if "answer" in chunk:
             print(chunk["answer"], end="", flush=True)
             response += chunk["answer"]
+    print("\n")
 
-    # print(f"\n--> here is the response: {response}\n")
     # Update chat history
     chat_history.append(HumanMessage(content=query))
     chat_history.append(AIMessage(content=response))
 
-    # Follow-up question
-    follow_up = "what wavelength are generated from it?"
+    # Question 2: Follow-up about technical specifications (wavelengths)
+    follow_up = "What wavelengths does it generate and what input does it use?"
     print(f"\nUser: {follow_up}")
 
     print("-->AI: ", end="", flush=True)
@@ -216,14 +220,16 @@ def example_1():
         if "answer" in chunk:
             print(chunk["answer"], end="", flush=True)
             response += chunk["answer"]
+    print("\n")
 
-    # print(f"\n--> here is the response: {response}\n")
     # Update chat history
     chat_history.append(HumanMessage(content=follow_up))
     chat_history.append(AIMessage(content=response))
 
-    # Second follow-up question referring to previous context
-    second_follow_up = "how many wavelength does it have ?"
+    # Question 3: Follow-up about technology innovations (relies on history)
+    second_follow_up = (
+        "How has this technology improved laser reliability and reduced cost?"
+    )
     print(f"\nUser: {second_follow_up}")
 
     print("-->AI: ", end="", flush=True)
@@ -234,14 +240,14 @@ def example_1():
         if "answer" in chunk:
             print(chunk["answer"], end="", flush=True)
             response += chunk["answer"]
+    print("\n")
 
     chat_history.append(HumanMessage(content=second_follow_up))
     chat_history.append(AIMessage(content=response))
 
-    third_follow_up = "how it has achieved lower cost?"
-    print(
-        f"\nUser: {third_follow_up} (knowledgebase has no information regarding this.)"
-    )
+    # Question 4: Completely irrelevant question
+    third_follow_up = "What's the best recipe for chocolate chip cookies?"
+    print(f"\nUser: {third_follow_up} (completely irrelevant question)")
 
     print("-->AI: ", end="", flush=True)
     for chunk in conversation_retrieval_chain.stream(
@@ -249,6 +255,8 @@ def example_1():
     ):
         if "answer" in chunk:
             print(chunk["answer"], end="", flush=True)
+    print("\n")
+    client.close()
 
 
 # Example 2: Testing with ambiguous follow-up questions
@@ -289,11 +297,11 @@ if __name__ == "__main__":
     # Run the examples
     # example_2()
 
-    # start_time = time.time()
-    # example_1()
-    # end_time = time.time()
-    # execution_time = end_time - start_time
-    # print(f"\nExecution time: {execution_time:.2f} seconds")
-    print("\n===== INTERACTIVE MODE =====")
-    print("Start a conversation (type 'exit' to quit)")
-    chat_with_documents()
+    start_time = time.time()
+    example_1()
+    end_time = time.time()
+    execution_time = end_time - start_time
+    print(f"\nExecution time: {execution_time:.2f} seconds")
+    # print("\n===== INTERACTIVE MODE =====")
+    # print("Start a conversation (type 'exit' to quit)")
+    # chat_with_documents()
