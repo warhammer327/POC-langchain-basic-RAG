@@ -162,7 +162,7 @@ def chat_with_documents(chat_history=None):
 
         # Process the query with the conversation chain
         response = ""
-        print("-->AI:", end="", flush=True)
+        # print("-->AI:", end="", flush=True)
         for chunk in conversation_retrieval_chain.stream(
             {"chat_history": chat_history, "input": user_input}
         ):

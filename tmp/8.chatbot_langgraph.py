@@ -59,7 +59,7 @@ def load_content():
 def split_documents(docs):
     docs[0][0].page_content.strip()[:1000]
     docs_list = [item for sublist in docs for item in sublist]
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=10, chunk_overlap=5)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=100, chunk_overlap=50)
     doc_splits = text_splitter.split_documents(docs_list)
     doc_splits[0].page_content.strip()
     return doc_splits
@@ -133,7 +133,7 @@ def insert_data_to_vectordb(client):
                     vector=vector,
                 )
         print("======Insertion completed======")
-        print("======Read from Product collection======")
+        print(f"======Read from {class_scheme_name} collection======")
         collection = client.collections.get(class_scheme_name).query.fetch_objects(
             limit=100
         )
@@ -151,7 +151,7 @@ def init_retriever_tool(vectorstore):
     )
     print("======Testing retriever======")
     try:
-        results = retriever.invoke("IQOM")
+        results = retriever.invoke("what is iqom?")
         print(f"Retrieved {len(results)} documents for test query 'iqom'")
         for i, doc in enumerate(results):
             print(f"Test result {i}: {doc.page_content[:100]}...")
